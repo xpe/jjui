@@ -229,50 +229,78 @@ func (m *Model) refreshPreview() tea.Cmd {
 
 func (m *Model) refreshPreviewForItem(item common.SelectedItem) tea.Cmd {
 	return common.Debounce(debounceId, debounceDuration, func() tea.Msg {
-		var args []string
-		previewWidth := strconv.Itoa(m.view.Width())
-		switch sel := item.(type) {
-		case common.SelectedFile:
-			args = jj.TemplatedArgs(config.Current.Preview.FileCommand, map[string]string{
-				jj.RevsetPlaceholder:       m.context.CurrentRevset,
-				jj.ChangeIdPlaceholder:     sel.ChangeId,
-				jj.CommitIdPlaceholder:     sel.CommitId,
-				jj.FilePlaceholder:         sel.File,
-				jj.PreviewWidthPlaceholder: previewWidth,
-			})
-		case common.SelectedRevision:
-			args = jj.TemplatedArgs(config.Current.Preview.RevisionCommand, map[string]string{
-				jj.RevsetPlaceholder:       m.context.CurrentRevset,
-				jj.ChangeIdPlaceholder:     sel.ChangeId,
-				jj.CommitIdPlaceholder:     sel.CommitId,
-				jj.PreviewWidthPlaceholder: previewWidth,
-			})
-		case common.SelectedCommit:
-			args = jj.TemplatedArgs(config.Current.Preview.EvologCommand, map[string]string{
-				jj.RevsetPlaceholder:       m.context.CurrentRevset,
-				jj.CommitIdPlaceholder:     sel.CommitId,
-				jj.PreviewWidthPlaceholder: previewWidth,
-			})
-		case common.SelectedOperation:
-			args = jj.TemplatedArgs(config.Current.Preview.OplogCommand, map[string]string{
-				jj.RevsetPlaceholder:       m.context.CurrentRevset,
-				jj.OperationIdPlaceholder:  sel.OperationId,
-				jj.PreviewWidthPlaceholder: previewWidth,
-			})
-		}
-
-		env := []string{
-			// The preview subprocess does not run in a pane-sized PTY, so let
-			// width-sensitive tools like `jj diff` see the preview size via the
-			// conventional terminal size environment variables.
-			"COLUMNS=" + strconv.Itoa(m.view.Width()),
-			"LINES=" + strconv.Itoa(m.view.Height()),
-		}
+		args, env := buildPreviewCommand(item, &config.Current.Preview, m.context.CurrentRevset, m.view.Width(), m.view.Height())
 		output, _ := m.context.RunCommandImmediateWithEnv(args, env)
 		return updatePreviewContentMsg{
 			Content: string(output),
 		}
 	})
+}
+
+// buildPreviewCommand returns the args and env for the preview subprocess. It
+// is pure so tests can assert on the env without running the command runner.
+//
+// Ordering matters: env substitutions are computed from the raw replacements
+// map before TemplatedArgs runs, because TemplatedArgs mutates the $file entry
+// to a shell-escaped form in place.
+func buildPreviewCommand(
+	item common.SelectedItem,
+	cfg *config.PreviewConfig,
+	currentRevset string,
+	width, height int,
+) (args []string, env []string) {
+	previewWidth := strconv.Itoa(width)
+	var (
+		template     []string
+		replacements map[string]string
+	)
+	switch sel := item.(type) {
+	case common.SelectedFile:
+		template = cfg.FileCommand
+		replacements = map[string]string{
+			jj.RevsetPlaceholder:       currentRevset,
+			jj.ChangeIdPlaceholder:     sel.ChangeId,
+			jj.CommitIdPlaceholder:     sel.CommitId,
+			jj.FilePlaceholder:         sel.File,
+			jj.PreviewWidthPlaceholder: previewWidth,
+		}
+	case common.SelectedRevision:
+		template = cfg.RevisionCommand
+		replacements = map[string]string{
+			jj.RevsetPlaceholder:       currentRevset,
+			jj.ChangeIdPlaceholder:     sel.ChangeId,
+			jj.CommitIdPlaceholder:     sel.CommitId,
+			jj.PreviewWidthPlaceholder: previewWidth,
+		}
+	case common.SelectedCommit:
+		template = cfg.EvologCommand
+		replacements = map[string]string{
+			jj.RevsetPlaceholder:       currentRevset,
+			jj.CommitIdPlaceholder:     sel.CommitId,
+			jj.PreviewWidthPlaceholder: previewWidth,
+		}
+	case common.SelectedOperation:
+		template = cfg.OplogCommand
+		replacements = map[string]string{
+			jj.RevsetPlaceholder:      currentRevset,
+			jj.OperationIdPlaceholder: sel.OperationId,
+			jj.PreviewWidthPlaceholder: previewWidth,
+		}
+	}
+
+	envAdditions := jj.SubstitutePlaceholders(cfg.Env, replacements)
+	args = jj.TemplatedArgs(template, replacements)
+
+	// The preview subprocess does not run in a pane-sized PTY, so let
+	// width-sensitive tools like `jj diff` see the preview size via the
+	// conventional terminal size environment variables. User-configured
+	// entries are appended last so they win via exec.Cmd.Env last-wins.
+	env = []string{
+		"COLUMNS=" + previewWidth,
+		"LINES=" + strconv.Itoa(height),
+	}
+	env = append(env, envAdditions...)
+	return args, env
 }
 
 func New(context *context.MainContext) *Model {

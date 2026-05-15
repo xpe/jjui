@@ -2,6 +2,7 @@ package jj
 
 import (
 	"fmt"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -367,6 +368,31 @@ func Evolog(revision string) CommandArgs {
 
 func Args(args ...string) CommandArgs {
 	return args
+}
+
+// SubstitutePlaceholders returns env entries ("KEY=VALUE") built by replacing
+// each $placeholder in the input values with the corresponding entry from
+// replacements. Unknown placeholders pass through unchanged. Unlike
+// TemplatedArgs, this does NOT mutate replacements. Output is sorted by key
+// for deterministic ordering.
+func SubstitutePlaceholders(values map[string]string, replacements map[string]string) []string {
+	if len(values) == 0 {
+		return nil
+	}
+	keys := make([]string, 0, len(values))
+	for k := range values {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	out := make([]string, 0, len(values))
+	for _, k := range keys {
+		v := values[k]
+		for ph, repl := range replacements {
+			v = strings.ReplaceAll(v, ph, repl)
+		}
+		out = append(out, k+"="+v)
+	}
+	return out
 }
 
 func TemplatedArgs(templatedArgs []string, replacements map[string]string) CommandArgs {

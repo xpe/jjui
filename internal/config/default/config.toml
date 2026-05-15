@@ -30,6 +30,11 @@ bindings_profile = ":builtin"
   width_percentage = 50.0
   width_increment_percentage = 5.0
 
+[preview.env]
+  # Force difftastic to wrap to the preview pane width.
+  # Set to "" to opt out (difftastic treats empty DFT_WIDTH as "use default").
+  DFT_WIDTH = "$preview_width"
+
 [oplog]
   limit = 200
 

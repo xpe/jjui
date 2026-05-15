@@ -143,6 +143,7 @@ type PreviewConfig struct {
 	Position                 string   `toml:"position"`
 	WidthPercentage          float64  `toml:"width_percentage"`
 	WidthIncrementPercentage float64  `toml:"width_increment_percentage"`
+	Env                      map[string]string `toml:"env"`
 }
 
 func GetPreviewPosition(c *Config) (PreviewPosition, error) {

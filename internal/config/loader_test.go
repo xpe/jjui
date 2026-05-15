@@ -163,6 +163,12 @@ func TestLoadDefaultConfig_SetsWindowTitleByDefault(t *testing.T) {
 	assert.True(t, cfg.UI.SetWindowTitle)
 }
 
+func TestLoadDefaultConfig_SetsDftWidthEnv(t *testing.T) {
+	cfg := loadDefaultConfig()
+
+	assert.Equal(t, "$preview_width", cfg.Preview.Env["DFT_WIDTH"])
+}
+
 func TestLoad_UISetWindowTitleCanBeDisabled(t *testing.T) {
 	cfg := loadDefaultConfig()
 

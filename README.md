@@ -56,6 +56,8 @@ While the preview window is showing, you can press; `ctrl+n` to scroll one line 
 
 Additionally, you can press `d` to show the contents of preview in diff view.
 
+Preview commands run with a `[preview.env]` table you can extend in your config; by default jjui sets `DFT_WIDTH` so [difftastic](https://difftastic.wilfred.me.uk/) reflows to the preview pane width.
+
 For detailed information, see [Preview](https://idursun.github.io/jjui/preview/) page.
 
 ![GIF](https://raw.github.com/idursun/jjui/docs/public/gifs/jjui_preview.gif)
